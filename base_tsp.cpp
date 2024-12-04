@@ -24,6 +24,16 @@ namespace fs = std::filesystem;
 struct City{
     int id;
     double x, y;
+
+    // 直接使用 for(const auto&city : cities) 输出信息，发现格式错误
+    // 修正输出错误，重载 << Operator
+    friend std::ostream& operator<<(std::ostream& os, const City&city){
+        std::ostringstream oss;
+        oss << "City " << city.id << ": ("
+            << std::fixed << std::setprecision(2) << city.x << ", "
+            << std::fixed << std::setprecision(2) << city.y << ")";
+        return os << oss.str();
+    }
 };
 
 std::vector<City> readCityFromDataSet(std::ifstream& file){
@@ -35,7 +45,7 @@ std::vector<City> readCityFromDataSet(std::ifstream& file){
     while(std::getline(file, line)){
         std::istringstream iss(line);
         std::string keyword;
-        iss >> keyword;
+        iss >> keyword;         // 问题出在这个 keyword, 即使已经判断了处于 NODE_COORD_SECTION 部分，之后的每行输入也会吃掉第一个直到空格前的内容
 
         if(keyword == "NODE_COORD_SECTION"){
             alreadyUsefulDataSection = true;
@@ -45,12 +55,19 @@ std::vector<City> readCityFromDataSet(std::ifstream& file){
         }
 
         if(alreadyUsefulDataSection){
+            // 查出一个 bug: 直接使用 std::istringstream iss(line) 进行参数的读入 
+            // iss >> city.id >> city.x >> city.y 会发生错位，没有正确对应
+            // 正确情况: city.id = 71009 city.x = 53500.0000 city.y = 123150.0000 但采用上述的输入方式，得到的对应是 city.id = 53500, city.x = 0. city.y = 123150 [❌]
+            // 修 bug 的解释: 再次重建一个流，因为之前的流 iss 读过之后，指针往后走，不会再向后，所以造成错位，需要再新建一个 dataStream 的流
+            std::istringstream dataStream(line);
             City city;
-            if(iss >> city.id >> city.x >> city.y){
-                cities.push_back(city);
-            }else{
-                std::cerr << "Error reading city data from line:" << line << std::endl;
+
+            if(dataStream >> city.id >> city.x >> city.y){
+                cities.emplace_back(city);
             }
+            else{
+                std::cerr << "Error: Can not parse line --- " << line << std::endl;
+            } 
         }
     }
 
@@ -72,7 +89,12 @@ int main(){
         auto cities = readCityFromDataSet(file);
 
         file.close();
+
+        for(const auto&city: cities){
+            std::cout << city << std::endl;
+        }
         std::cout << "Read " << cities.size() << " cities from the TSP file." << std::endl;
+
     }catch(const std::exception& e){
         std::cerr << "Exception occurred: " << e.what() << std::endl;
         return 1;
