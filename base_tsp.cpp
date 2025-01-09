@@ -38,41 +38,43 @@ struct City{
 };
 
 //=================================== 1. 数据集读取部分 =======================================
+/*
+对数据集读取部分作一个修改，正确性上无影响，
+实际上可以针对待读取数据 .tsp 文件的特定格式，前面是文字部分，后面是正式的数字部分，设置的 while 循环中可以一上来先判断是否是文字部分
+好处是: 省略了数字部分还要多余增加 std::istringstream iss(line) 和 std::string keyword; iss >> keyword; 的表述
+*/
 std::vector<City> readCityFromDataSet(std::ifstream& file){
     std::string line;
     std::vector<City> cities;
-
     bool alreadyUsefulDataSection = false; // 是否采集到真正有效的坐标数据
 
     while(std::getline(file, line)){
-        std::istringstream iss(line);
-        std::string keyword;
-        iss >> keyword;         // 问题出在这个 keyword, 即使已经判断了处于 NODE_COORD_SECTION 部分，之后的每行输入也会吃掉第一个直到空格前的内容
+        if(!alreadyUsefulDataSection){
+            std::istringstream iss(line);
+            std::string keyword;
+            iss >> keyword;
 
-        if(keyword == "NODE_COORD_SECTION"){
-            alreadyUsefulDataSection = true;
+            if(keyword == "NODE_COORD_SECTION"){
+                alreadyUsefulDataSection = true;
+            }
             continue;
-        }else if(keyword == "EOF" || file.eof()){
+        }
+
+        // 不属于这个 if 条件的部分，则属于数字部分或者最后的 eof 读取过程
+        if(line == "EOF" || file.eof()){
             break;
         }
 
-        if(alreadyUsefulDataSection){
-            // 查出一个 bug: 直接使用 std::istringstream iss(line) 进行参数的读入 
-            // iss >> city.id >> city.x >> city.y 会发生错位，没有正确对应
-            // 正确情况: city.id = 71009 city.x = 53500.0000 city.y = 123150.0000 但采用上述的输入方式，得到的对应是 city.id = 53500, city.x = 0. city.y = 123150 [❌]
-            // 修 bug 的解释: 再次重建一个流，因为之前的流 iss 读过之后，指针往后走，不会再向后，所以造成错位，需要再新建一个 dataStream 的流
-            std::istringstream dataStream(line);
-            City city;
+        // 接下来是数字部分的读取过程
+        std::istringstream dataStream(line);
+        City city;
 
-            if(dataStream >> city.id >> city.x >> city.y){
-                cities.emplace_back(city);
-            }
-            else{
-                std::cerr << "Error: Can not parse line --- " << line << std::endl;
-            } 
+        if(dataStream >> city.id >> city.x >> city.y){
+            cities.emplace_back(city);
+        }else{
+            std::cerr << "Error: Can not parse line ---" << line << std::endl;
         }
     }
-
     return cities;
 }
 
@@ -81,10 +83,10 @@ std::vector<City> insert_tsp_information(){
         // 这里使用相对路径来读取 world.tsp 等格式
         // 首先显示一个当前的工作路径，读取的数据集在子文件夹 dataSet 中
         std::cout << "Current working directory: " << fs::current_path() << std::endl;
-        std::ifstream file("dataSet/ch71009.tsp");  // 传递已经打开的文件流
+        std::ifstream file("dataSet/dj38.tsp");  // 传递已经打开的文件流
 
         if(!file.is_open()){
-            throw std::runtime_error("Could not open file: dataSet/ch71009.tsp");
+            throw std::runtime_error("Could not open file: dataSet/dj38.tsp");
         }
 
         auto cities = readCityFromDataSet(file);
@@ -146,11 +148,68 @@ void print_distanceMatrix(std::vector<std::vector<double>> &distanceMatrix){
     }
 }
 //==================================================================================================
+/*
+version 3: 正式的最近邻算法
+算法的流程是:
+1. 构建距离矩阵
+2. 选择起始城市，初始化路径长度
+3. 迭代
+    3.1 从当前城市出发，找到距离最近的未访问城市。
+    3.2 将最近的未访问城市添加到路径中，并将路径长度增加上从当前城市到最近城市的距离。
+    3.3 将最近的未访问城市标记为已访问
+4. 回到起始城市: 在所有城市都被访问后，路径的最后一个城市设置为起始城市，形成一条回路
+5. 计算路径长度
+*/
+//===========================================3. 算法的主要部分===========================================
+double nearest_neighbour(std::vector<std::vector<double>>& distanceMatrix){
+    // 1. 设置城市是否被访问的情况
+    int n = distanceMatrix.size();
+    std::vector<bool> visited(n, false);
+    std::vector<int> visited_cities_id;
+    visited[0] = true;  // 从第一个城市开始
+    
+    int startCity = 0;
+    int currentCity = startCity;
+    double totalDistance = 0.0;
+
+    while(true){
+        double minimalDistance = std::numeric_limits<double>::max();
+        // 设置第一个 for 循环找到最小距离
+        for(int col = 0; col < n; col++){
+            if(visited[col] == false && distanceMatrix[currentCity][col] < minimalDistance){
+                minimalDistance = distanceMatrix[currentCity][col];
+            }
+        }
+        // 设置第二个 for 循环找到最小距离对应的 Cities(但实际上如果距离没有重复相等的情况下，实际不需要两个 for 循环)
+        for(int col = 0; col < n; col++){
+            if(visited[col] == false && distanceMatrix[currentCity][col] == minimalDistance){
+                visited[col] = true;
+                visited_cities_id.push_back(col);
+                totalDistance += minimalDistance;
+                currentCity = col;
+                break;
+            }
+        }
+
+        // 所有城市都被访问后，跳出循环
+        if(visited_cities_id.size() == n - 1){
+            // 设置一个 debug 的打印功能
+            break;
+        }
+    }
+    // 设置一个 debug 的打印功能
+    std::cout << "Visited cities: ";
+    for(const auto&city_id: visited_cities_id){
+        std::cout << city_id << " ";
+    } 
+    std::cout << std::endl;
+    return totalDistance;
+}
 
 int main(){
     auto cities = insert_tsp_information();
     auto distanceMatrix = calculate_distanceMatrix(cities);
     // print_distanceMatrix(distanceMatrix);                // 辅助测试输出的距离矩阵，实际上会是一张很大的表，针对 ch71009.tsp, 直接报 killed
-
+    std::cout << "total distance: " << nearest_neighbour(distanceMatrix) << std::endl;
     return 0;
 }
