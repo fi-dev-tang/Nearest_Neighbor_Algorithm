@@ -18,6 +18,7 @@ NODE_COORD_SECTION
 #include <vector>
 #include <sstream>
 #include <filesystem>
+#include <cmath>
 
 namespace fs = std::filesystem;
 
@@ -36,6 +37,7 @@ struct City{
     }
 };
 
+//=================================== 1. 数据集读取部分 =======================================
 std::vector<City> readCityFromDataSet(std::ifstream& file){
     std::string line;
     std::vector<City> cities;
@@ -74,8 +76,7 @@ std::vector<City> readCityFromDataSet(std::ifstream& file){
     return cities;
 }
 
-
-int main(){
+std::vector<City> insert_tsp_information(){
     try{
         // 这里使用相对路径来读取 world.tsp 等格式
         // 首先显示一个当前的工作路径，读取的数据集在子文件夹 dataSet 中
@@ -90,14 +91,66 @@ int main(){
 
         file.close();
 
-        for(const auto&city: cities){
-            std::cout << city << std::endl;
-        }
+        // for(const auto&city: cities){
+        //     std::cout << city << std::endl;
+        // }
         std::cout << "Read " << cities.size() << " cities from the TSP file." << std::endl;
-
+        return cities;
     }catch(const std::exception& e){
         std::cerr << "Exception occurred: " << e.what() << std::endl;
-        return 1;
+        return {};
     }
+}
+//===========================================2. 创建距离矩阵 ===================================================
+/*
+base 版本的算法部分: 
+首先构建距离矩阵(base 版本采取最直观的思路,后续在优化的时候加入新的加速计算方法)
+version 2 对 version 1 提出了一个修改，希望传递这个 cities 数组, 对抛出的异常进行处理
+version 2. 构建当前 City 数组对应的距离矩阵
+传入的参数是 City 数组，返回一个距离矩阵 distanceMatrix, 其中 distanceMatrix[i][j] 表示 City[i] 和 City[j] 之间的距离
+观察到执行过程中，对于 ch71009.tsp 数据集，base 测试时执行打印距离矩阵，结果直接报 killed
+*/
+std::vector<std::vector<double>> calculate_distanceMatrix(std::vector<City> cities){
+    // 1. 初始化要返回的距离矩阵
+    std::vector<std::vector<double>> distanceMatrix(cities.size(), std::vector<double>(cities.size(), 0.0));
+    for(int i = 0; i < cities.size(); i++){
+        for(int j = i + 1; j < cities.size(); j++){
+            double x_diff = cities[i].x - cities[j].x;
+            double y_diff = cities[i].y - cities[j].y;
+            double distance = std::sqrt(x_diff * x_diff + y_diff * y_diff);
+            distanceMatrix[i][j] = distance;
+            distanceMatrix[j][i] = distance;
+        }
+    }
+    return distanceMatrix;
+}
+
+void print_distanceMatrix(std::vector<std::vector<double>> &distanceMatrix){
+    int n = distanceMatrix.size();
+    int width = 8;                      // 设置小数的输出格式，两位小数点，以及正负号的空间
+
+    // 打印列标题
+    std::cout << "      ";
+    for(int col = 0; col < n; col++){
+        std::cout << std::setw(width) << col << "";
+    }
+    std::cout << std::endl;
+
+    // 打印矩阵内容
+    for(int row = 0; row < n; row++){
+        std::cout << std::setw(3) << row << " "; // 打印行标记
+        for(int col = 0; col < n; col++){
+            std::cout << std::setw(width) << distanceMatrix[row][col] << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+//==================================================================================================
+
+int main(){
+    auto cities = insert_tsp_information();
+    auto distanceMatrix = calculate_distanceMatrix(cities);
+    // print_distanceMatrix(distanceMatrix);                // 辅助测试输出的距离矩阵，实际上会是一张很大的表，针对 ch71009.tsp, 直接报 killed
+
     return 0;
 }
