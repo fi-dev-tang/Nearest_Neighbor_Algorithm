@@ -60,47 +60,42 @@ std::vector<City> readCityFromDataSet(std::ifstream& file){
             continue;
         }
 
-        // 不属于这个 if 条件的部分，则属于数字部分或者最后的 eof 读取过程
-        if(line == "EOF" || file.eof()){
-            break;
-        }
-
         // 接下来是数字部分的读取过程
         std::istringstream dataStream(line);
         City city;
 
         if(dataStream >> city.id >> city.x >> city.y){
             cities.emplace_back(city);
-        }else{
+        }
+        else if(line == "EOF" || file.eof()){       // 不属于这个 if 条件的部分，则属于数字部分或者最后的 eof 读取过程
+            break;
+        }else {
             std::cerr << "Error: Can not parse line ---" << line << std::endl;
         }
     }
     return cities;
 }
 
-std::vector<City> insert_tsp_information(){
+std::vector<City> insert_tsp_information(const std::string& filename){
     try{
-        // 这里使用相对路径来读取 world.tsp 等格式
-        // 首先显示一个当前的工作路径，读取的数据集在子文件夹 dataSet 中
+        // 构建完整的文件路径
+        std::string filepath = "dataSet/" + filename;
+
         std::cout << "Current working directory: " << fs::current_path() << std::endl;
-        std::ifstream file("dataSet/dj38.tsp");  // 传递已经打开的文件流
+        std::cout << "Reading file: " << filepath << std::endl;
 
+        std::ifstream file(filepath);
         if(!file.is_open()){
-            throw std::runtime_error("Could not open file: dataSet/dj38.tsp");
-        }
-
+            throw std::runtime_error("Could not open file: " + filepath);
+        } 
         auto cities = readCityFromDataSet(file);
-
         file.close();
 
-        // for(const auto&city: cities){
-        //     std::cout << city << std::endl;
-        // }
-        std::cout << "Read " << cities.size() << " cities from the TSP file." << std::endl;
+        std::cout << "Reading from tsp file: " << cities.size() << " cities." << std::endl;
         return cities;
     }catch(const std::exception& e){
         std::cerr << "Exception occurred: " << e.what() << std::endl;
-        return {};
+        throw;
     }
 }
 //===========================================2. 创建距离矩阵 ===================================================
@@ -201,10 +196,12 @@ double nearest_neighbour(std::vector<std::vector<double>>& distanceMatrix){
 
     // 4. 返回起点，完成回路
     totalDistance += distanceMatrix[currentCity][startCity];
-    for(auto &city_id: visited_cities_id){
-        std::cout << city_id << "   ";
-    }
-    std::cout << std::endl;
+
+    // 下面的打印可以暂时注释，城市数目过大时，打印意义不大
+    // for(auto &city_id: visited_cities_id){
+    //     std::cout << city_id << "   ";
+    // }
+    // std::cout << std::endl;
     std::cout << "total distance: " ;
     return totalDistance;
 }
@@ -215,10 +212,20 @@ version 3.1: 最后做一点小的修改，更灵活的文件处理方式
 希望从命令行中读取文件名，而不是每次都固定写，
 修改之前的 insert_tsp_information 函数签名为 const std::string& filepath
 */
-int main(){
-    auto cities = insert_tsp_information();
-    auto distanceMatrix = calculate_distanceMatrix(cities);
-    // print_distanceMatrix(distanceMatrix);                // 辅助测试输出的距离矩阵，实际上会是一张很大的表，针对 ch71009.tsp, 直接报 killed
-    std::cout << nearest_neighbour(distanceMatrix) << std::endl;
-    return 0;
+int main(int argc, char* argv[]){
+    if(argc != 2){
+        std::cerr << "Usage: " << argv[0] << " <tsp filename>" << std::endl;
+        std::cerr << "Example: " << argv[0] << " world.tsp" << std::endl;
+        return 1;
+    }
+
+    try{
+        auto cities = insert_tsp_information(argv[1]);
+        auto distanceMatrix = calculate_distanceMatrix(cities);
+        // print_distanceMatrix(distanceMatrix);                // 辅助测试输出的距离矩阵，实际上会是一张很大的表，针对 ch71009.tsp, 直接报 killed
+        std::cout << nearest_neighbour(distanceMatrix) << std::endl;
+        return 0;
+    }catch(const std::exception& e){
+        return 1;
+    }
 }
