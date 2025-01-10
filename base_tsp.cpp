@@ -161,55 +161,64 @@ version 3: 正式的最近邻算法
 5. 计算路径长度
 */
 //===========================================3. 算法的主要部分===========================================
+/*
+修改版本：自己写的版本存在两个大问题，
+1. 两次 for 循环，认为第 2 次 for 循环用来寻找最近邻的城市，实际上不太必要
+2. 终止条件，没有设置回路处理
+*/
 double nearest_neighbour(std::vector<std::vector<double>>& distanceMatrix){
-    // 1. 设置城市是否被访问的情况
+    // 1. 初始化
     int n = distanceMatrix.size();
     std::vector<bool> visited(n, false);
     std::vector<int> visited_cities_id;
-    visited[0] = true;  // 从第一个城市开始
-    
+
+    // 2. 设置起始点
     int startCity = 0;
     int currentCity = startCity;
+    visited[startCity] = true;
+    visited_cities_id.push_back(startCity + 1);             // city_id 实际在 .tsp 文件中，从 1 开始编号
     double totalDistance = 0.0;
 
-    while(true){
+    // 3. 主循环: 访问所有城市
+    while(visited_cities_id.size() < n){
         double minimalDistance = std::numeric_limits<double>::max();
-        // 设置第一个 for 循环找到最小距离
-        for(int col = 0; col < n; col++){
-            if(visited[col] == false && distanceMatrix[currentCity][col] < minimalDistance){
-                minimalDistance = distanceMatrix[currentCity][col];
-            }
-        }
-        // 设置第二个 for 循环找到最小距离对应的 Cities(但实际上如果距离没有重复相等的情况下，实际不需要两个 for 循环)
-        for(int col = 0; col < n; col++){
-            if(visited[col] == false && distanceMatrix[currentCity][col] == minimalDistance){
-                visited[col] = true;
-                visited_cities_id.push_back(col);
-                totalDistance += minimalDistance;
-                currentCity = col;
-                break;
+        int nextCity = -1;
+
+        // 3.1 寻找最近的未访问城市
+        for(int j = 0; j < n; j++){
+            if(!visited[j] && distanceMatrix[currentCity][j] < minimalDistance){
+                minimalDistance = distanceMatrix[currentCity][j];
+                nextCity = j;
             }
         }
 
-        // 所有城市都被访问后，跳出循环
-        if(visited_cities_id.size() == n - 1){
-            // 设置一个 debug 的打印功能
-            break;
-        }
+        // 3.2 更新路径和距离
+        visited[nextCity] = true;
+        visited_cities_id.push_back(nextCity + 1);
+        totalDistance += minimalDistance;
+        currentCity = nextCity;
     }
-    // 设置一个 debug 的打印功能
-    std::cout << "Visited cities: ";
-    for(const auto&city_id: visited_cities_id){
-        std::cout << city_id << " ";
-    } 
+
+    // 4. 返回起点，完成回路
+    totalDistance += distanceMatrix[currentCity][startCity];
+    for(auto &city_id: visited_cities_id){
+        std::cout << city_id << "   ";
+    }
     std::cout << std::endl;
+    std::cout << "total distance: " ;
     return totalDistance;
 }
 
+
+/*
+version 3.1: 最后做一点小的修改，更灵活的文件处理方式
+希望从命令行中读取文件名，而不是每次都固定写，
+修改之前的 insert_tsp_information 函数签名为 const std::string& filepath
+*/
 int main(){
     auto cities = insert_tsp_information();
     auto distanceMatrix = calculate_distanceMatrix(cities);
     // print_distanceMatrix(distanceMatrix);                // 辅助测试输出的距离矩阵，实际上会是一张很大的表，针对 ch71009.tsp, 直接报 killed
-    std::cout << "total distance: " << nearest_neighbour(distanceMatrix) << std::endl;
+    std::cout << nearest_neighbour(distanceMatrix) << std::endl;
     return 0;
 }
