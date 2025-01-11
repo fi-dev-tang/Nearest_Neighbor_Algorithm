@@ -4,6 +4,7 @@
 TSP 的数据集采集自:
 https://www.math.uwaterloo.ca/tsp/world/countries.html
 
+# base_tsp: 测试的baseline
 比较直接的增量式开发
 
 #### 1. 增加从 .tsp 格式的文件中读取(x,y) 坐标到 std::vector<City> 中
@@ -25,7 +26,7 @@ for(int i = 0; i < cities.size(); i++){
 ```
 这个步骤对于 ch71009.tsp 的测试集来说，运行结果直接报 killed
 
-![71009.jsp错误](base_error.png)
+![71009.jsp错误](picture/base_error.png)
 
 ### 分析 v0.0: 关于 ch71009.tsp 运行报 killed 的原因
 > 内存不足
@@ -47,9 +48,9 @@ free -h
 目前认为应该是算法只能实现局部最优，而不是全局最优。
 对照下面两个结果集合
 
-![compare1](/compare1.png)
+![compare1](picture/compare1.png)
 
-![compare2](/compare2.png)
+![compare2](picture/compare2.png)
 
 同样一组数据集，使用 bm33708.tsp, 最近邻算法得到的路径长度为 1203410, 网站上公布的最优结果是 959289,
 路径的准确率在 79.714228%, 认为这个计算结果不能令人满意。
@@ -63,3 +64,16 @@ free -h
 
 #### version 4. 修改灵活输入，现在程序运行的命令是 ./base_tsp <tsp文件名>
 打算以这一个版本为 base, 先进行运行速度上的优化。
+
+## 性能分析工具
+采用 likwid, 具体的介绍写在
+
+[likwid usage](/likwid.md)
+
+# optimized_tsp 优化部分
+
+## 1. 最直观的访问上的修改
+对于原来的 calculate_distanceMatrix, 注意到需要求解距离矩阵，
+在每个 for(int j = i + 1; ...) 的内层循环中，需要读取 cities.size() 次的 cities[i].x 和 cities[i].y
+
+最简单的优化是，将读取 cities[i].x 和 cities[i].y 放在 for 循环之外，降低对 cities[i].x 和 cities[i].y 的读取次数。
