@@ -42,3 +42,27 @@ hwloc 提供命令行工具和 C API 以获取节点内关键计算元素的层�
 > msr(model specific register): 特定于处理器型号的寄存器，用于实现性能监视，电源管理，调试和其它特定功能
 
 ![msr_error](picture/msr_error.png)
+
+这个错误认为是由于在 Debian 虚拟机上进行的测试，认为不支持或者禁用对 MSR 的直接访问，确保一个虚拟机的操作不会影响到宿主机或者其它虚拟机。
+
+提示使用
+```bash
+sudo modprobe msr 
+lsmod | grep msr
+```
+
+![msr_mode](picture/msr_mode.png)
+
+对输出信息作一个解释:
+1. `msr` 模块确实被加载了，但当前没有正在使用这个模块的其它模块或进程，所以使用计数是 `0`。
+2. `intel_rapl_msr` 模块与 `MSR` 相关，它是用于管理 Intel RAPL(Running Average Power Limit)的模块。这是 Intel 提供的一组接口，用于实时监控和管理 CPU 和内存的功耗。
+3. `intel_rap_common` 是 `intal_rap_msr` 依赖的公共模块。
+
+返回结果说明 `msr` 模块存在且已经加载，显示了与功耗管理相关的模块也加载在系统中。
+
+换了自己本地的虚拟机之后，运行出现的问题是:
+
+![cpu_null_error](picture/cpu_nil.png)
+
+问题是处理器型号不支持。后续不打算在本地电脑上做测试。
+
