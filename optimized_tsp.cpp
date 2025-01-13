@@ -5,6 +5,7 @@
 #include <sstream>
 #include <filesystem>
 #include <cmath>
+#include <omp.h>
 
 namespace fs = std::filesystem;
 
@@ -92,13 +93,25 @@ std::vector<City> insert_tsp_information(const std::string& filename){
 
 cities[i].x 和 cities[i].y 存储在局部变量中，由于局部变量通常位于CPU寄存器或靠近 CPU 的缓存中，访问速度更快。
 在整个内循环期间，cities[i].x 和 cities[i].y 的值不变，更好地利用CPU缓存，减少 cache miss。
+
+优化版本 version 2:
+开启并行执行 openMP 和向量化(SIMD)
+
+做法: 1. 添加 #pragma omp parallel for schedule(dynamic) 指令 
+        外层循环可以并行化，动态调度策略，更好地平衡工作负载
+      2. 添加 #pragma omp simd 指令
+        内层循环启用向量化，编译器生成 SIMD 指令加速计算
 */
 std::vector<std::vector<double>> calculate_distanceMatrix(std::vector<City> cities){
     // 1. 初始化要返回的距离矩阵
     std::vector<std::vector<double>> distanceMatrix(cities.size(), std::vector<double>(cities.size(), 0.0));
+    
+    #pragma omp parallel for schedule(dynamic)  // 外层 for 循环可以并行
     for(int i = 0; i < cities.size(); i++){
         double x_i = cities[i].x;
         double y_i = cities[i].y;
+
+        #pragma omp simd                        // 内层使用单指令多数据
         for(int j = i + 1; j < cities.size(); j++){
             double x_diff = x_i - cities[j].x;
             double y_diff = y_i - cities[j].y;
