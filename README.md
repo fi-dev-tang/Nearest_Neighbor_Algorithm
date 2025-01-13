@@ -72,8 +72,12 @@ free -h
 
 # optimized_tsp 优化部分
 
+对应的实验结果记录在 
+[report](/report.md)
+
 ## 1. 最直观的访问上的修改
 对于原来的 calculate_distanceMatrix, 注意到需要求解距离矩阵，
 在每个 for(int j = i + 1; ...) 的内层循环中，需要读取 cities.size() 次的 cities[i].x 和 cities[i].y
 
 最简单的优化是，将读取 cities[i].x 和 cities[i].y 放在 for 循环之外，降低对 cities[i].x 和 cities[i].y 的读取次数。
+
